@@ -1,0 +1,131 @@
+-----
+
+# Guia de Geração de Certificados PKI para Azure VPN Gateway
+
+## Introdução
+
+Este guia detalha o procedimento para a criação de certificados Root (CA) e Client para autenticação em VPNs, especificamente para uso com o **Azure Virtual Network Gateway**. O processo utiliza a ferramenta OpenSSL e é fundamental para estabelecer uma conexão segura e confiável de Ponto a Site (Point-to-Site) para a sua rede virtual no Azure.
+
+## Conceitos Chave
+
+### Infraestrutura de Chave Pública (PKI)
+
+A PKI é o alicerce para a segurança de comunicação de dados, garantindo a autenticidade e a integridade. Ela opera através de uma cadeia de confiança: o **Certificado Root** (a Autoridade de Certificação, ou CA) assina e valida os certificados dos clientes, que por sua vez, são usados para autenticar a conexão com o Azure VPN Gateway. A segurança de toda a sua comunicação depende da integridade do certificado Root e da sua chave privada.
+
+**Componentes Principais:**
+
+  * **Autoridade de Certificação (CA):** Entidade de confiança que emite e gerencia certificados digitais (o Certificado Root).
+  * **Certificado Digital:** Arquivo eletrônico que vincula uma chave pública a uma identidade. O Azure VPN Gateway usa esse certificado para verificar a identidade do cliente que está tentando se conectar.
+  * **Chave Privada:** Um segredo criptográfico. A chave privada do Certificado Root é usada para assinar os certificados dos clientes, enquanto a chave privada do Certificado Client é usada para estabelecer o túnel seguro de VPN.
+
+### SSL/TLS e o Azure VPN Gateway
+
+O Azure Virtual Network Gateway suporta autenticação de certificado usando o protocolo **SSL/TLS**. Isso significa que, em vez de usar uma senha, a identidade do cliente é verificada pelo certificado digital. Ao carregar o certificado Root no Azure, a plataforma passa a confiar em todos os certificados que foram assinados por ele, simplificando o gerenciamento de acesso para múltiplos usuários.
+
+-----
+
+## Parte 1: Criação do Certificado Root (CA)
+
+Este certificado atuará como a Autoridade de Certificação (CA) para assinar todos os certificados de cliente, estabelecendo a cadeia de confiança com o Azure.
+
+**IMPORTANTE:** A chave privada (`root.key`) deve ser mantida em segurança máxima. O comprometimento desta chave compromete toda a infraestrutura de VPN.
+
+### Etapa 1.1: Geração da Chave Privada Root
+
+Cria uma chave privada de 2048 bits. Este é o segredo da sua CA.
+
+```bash
+openssl genrsa -out root.key 2048
+```
+
+### Etapa 1.2: Criação do Certificado Root Auto-Assinado
+
+Gera o certificado digital (`.crt`) que será carregado no Azure. Ele tem validade de 10 anos e é a âncora de confiança para todos os clientes.
+
+```bash
+openssl req -x509 -new -nodes -key root.key -sha256 -days 3650 -subj "/CN=MinhaVpnRootCA" -out root.crt
+```
+
+*(Nota: O `/CN` (Common Name) pode ser qualquer nome descritivo para sua CA Raiz).*
+
+-----
+
+## Parte 2: Criação do Certificado Client
+
+Este certificado será usado por cada usuário ou dispositivo para autenticar a conexão Ponto a Site com a VPN do Azure. Ele deve ser assinado pelo Certificado Root criado na Parte 1.
+
+### Etapa 2.1: Geração da Chave Privada do Cliente
+
+Gera a chave privada do usuário, que será necessária para a conexão.
+
+```bash
+openssl genrsa -out client.key 2048
+```
+
+### Etapa 2.2: Criação da Solicitação de Assinatura (CSR)
+
+Cria um arquivo com as informações públicas do cliente, a ser assinado pela sua CA Root. O `CN` (Common Name) deve identificar unicamente o cliente (ex: nome do usuário ou do dispositivo).
+
+```bash
+openssl req -new -key client.key -out client.csr -subj "/CN=nome-do-usuario-vpn"
+```
+
+### Etapa 2.3: Assinatura do Certificado Client pela CA Root
+
+Assina o certificado do cliente com a sua CA, emitindo um certificado final com validade de 1 ano. A extensão `extendedKeyUsage=clientAuth` é crucial, pois informa ao Azure que este certificado é especificamente para autenticação de cliente.
+
+```bash
+openssl x509 -req -in client.csr -CA root.crt -CAkey root.key \
+-CAcreateserial -out client.crt -days 365 -sha256 \
+-extfile <(printf "extendedKeyUsage=clientAuth")
+```
+
+*(Nota: O arquivo `root.srl` (`-CAcreateserial`) será criado para rastrear os certificados assinados. Guarde-o junto com sua CA).*
+
+-----
+
+## Parte 3: Instruções de Uso para o Azure e o Cliente VPN
+
+Depois de criar os certificados (`root.crt`, `client.crt`, `client.key`), você deve usá-los no Azure e no arquivo de configuração do cliente VPN.
+
+### Etapa 3.1: Carregando o Certificado Root no Azure
+
+1.  No portal do Azure, navegue até o seu **Virtual Network Gateway**.
+2.  Na seção **"Configuração Ponto a Site"**, localize a opção **"Certificados Raiz"**.
+3.  Abra o arquivo `root.crt` em um editor de texto.
+4.  Copie todo o conteúdo (incluindo as linhas `-----BEGIN CERTIFICATE-----` e `-----END CERTIFICATE-----`).
+5.  Cole o conteúdo no campo **"Dados do Certificado Raiz Público"** no Azure e dê um nome a ele.
+
+### Etapa 3.2: Configurando o Cliente OpenVPN
+
+O Azure gera um arquivo de configuração de cliente OpenVPN (`.ovpn`). Este arquivo de texto precisa ser editado para incluir o conteúdo do certificado Root, do certificado Client e da chave privada do cliente.
+
+Use os seguintes comandos para obter o conteúdo de cada arquivo e cole-os nas seções correspondentes dentro do arquivo `.ovpn`:
+
+**1. Conteúdo do Certificado Root (CA)**
+*Cole na seção `<ca>`...`</ca>`*
+
+```bash
+cat root.crt
+```
+
+**2. Conteúdo do Certificado Client**
+*Cole na seção `<cert>`...`</cert>`*
+
+```bash
+cat client.crt
+```
+
+**3. Conteúdo da Chave Privada do Cliente**
+*Cole na seção `<key>`...`</key>`*
+
+```bash
+cat client.key
+```
+
+-----
+
+## Observações Finais
+
+  * Para a maioria dos clientes OpenVPN no Linux, os arquivos de chave e certificado (`.key` e `.crt`) podem ser usados diretamente referenciados no arquivo de configuração, em vez de embuti-los.
+  * A execução do comando `openvpn` pode exigir permissões de superusuário (`sudo`) para criar a interface de rede virtual (TUN/TAP).
