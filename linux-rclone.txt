@@ -188,5 +188,8 @@ Isso apenas apaga a configuração do Rclone no seu notebook. O Google ainda lis
 
 <!-- end list -->
 
+
+VERSÃO: 11/2025
+
 ```
 ```
