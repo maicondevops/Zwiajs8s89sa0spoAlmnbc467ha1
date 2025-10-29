@@ -93,7 +93,7 @@ Depois de criar os certificados (`root.crt`, `client.crt`, `client.key`), você 
 1.  No portal do Azure, navegue até o seu **Virtual Network Gateway**.
 2.  Na seção **"Configuração Ponto a Site"**, localize a opção **"Certificados Raiz"**.
 3.  Abra o arquivo `root.crt` em um editor de texto.
-4.  Copie todo o conteúdo (incluindo as linhas `-----BEGIN CERTIFICATE-----` e `-----END CERTIFICATE-----`).
+4.  Copie todo o conteúdo (encontrado dentro das linhas `-----BEGIN CERTIFICATE-----` e `-----END CERTIFICATE-----`).
 5.  Cole o conteúdo no campo **"Dados do Certificado Raiz Público"** no Azure e dê um nome a ele.
 
 ### Etapa 3.2: Configurando o Cliente OpenVPN
