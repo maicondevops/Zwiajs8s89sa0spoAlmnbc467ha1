@@ -1,9 +1,3 @@
-Com certeza. Analisei seus comandos e identifiquei uma oportunidade de melhoria significativa que tornará seu manual muito mais limpo e fácil de manter.
-
-A principal melhoria é **centralizar todas as suas regras de `--exclude`** em um único arquivo de filtro. Em vez de repetir 10 flags de exclusão para cada comando, você pode simplesmente apontar para esse arquivo.
-
-Abaixo está o manual atualizado, com seus exemplos incorporados na Seção 4, devidamente mascarados e otimizados.
-
 -----
 
 ````md
