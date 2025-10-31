@@ -1,1 +1,193 @@
+===============================================================================
+===== SED
+===============================================================================
 
+#### Busca um termo em arquivos de um diretório, 
+
+sudo grep -h '^[ \t]*server_name' /etc/nginx/sites-available/* | sed -e 's/^[ \t]*server_name[ \t]\+//' -e 's/;//' | sort -u
+
+Esse trecho é o "coração" da limpeza do texto. É uma expressão regular usada dentro do comando `s` (substitute) do `sed`.
+
+A função dele é: **"Encontre e apague a diretiva `server_name` e todos os espaços/tabs ao redor dela no início da linha."**
+
+Vamos dissecar o padrão de busca: `^[ \t]*server_name[ \t]\+`
+
+-----
+
+### Componente por Componente
+
+  * **`s/`...`/`...`/`**
+    Esta é a sintaxe básica do comando "substitute" (substituir) do `sed`:
+    `s / O_QUE_PROCURAR / PELO_O_QUE_SUBSTITUIR /`
+
+  * **`^` (Âncora de Início)**
+
+      * É uma "âncora". Ela diz ao `sed` para **procurar apenas no início absoluto da linha**.
+      * Isso impede que o `sed` encontre um `server_name` que esteja no meio de um comentário (ex: `# Isso configura o server_name`).
+
+  * **`[ \t]*` (Indentação)**
+
+      * `[ \t]`: É uma "classe de caracteres". Significa "encontre um caractere de espaço ( ) OU um caractere de tab (`\t`)".
+      * `*`: É um "quantificador". Significa "encontre o item anterior (o espaço ou tab) **zero ou mais vezes**".
+      * **Juntos:** Isso permite que o comando funcione independentemente da indentação do seu arquivo. Ele vai encontrar `server_name...` (0 espaços) ou `     server_name... ` (4 espaços) ou `		server_name...` (2 tabs).
+
+  * **`server_name` (O Alvo Literal)**
+
+      * Simplesmente o texto literal que queremos encontrar.
+
+  * **`[ \t]\+` (O Espaçamento)**
+
+      * `[ \t]`: Novamente, "um espaço OU um tab".
+      * `\+`: Um quantificador que significa "encontre o item anterior **uma ou mais vezes**".
+      * **Por que `\+` (um ou mais) e não `*` (zero ou mais)?** Porque sabemos que *deve* haver pelo menos um espaço ou tab separando a diretiva `server_name` do seu valor (a URL). Isso torna a busca mais precisa.
+
+-----
+
+### O Comando Completo
+
+Agora, juntando com a parte da substituição:
+
+`'s/^[ \t]*server_name[ \t]\+//'`
+
+  * **Procurar por:** `^[ \t]*server_name[ \t]\+`
+
+      * *Tradução: "No início da linha, encontre qualquer indentação (ou nenhuma), seguida do texto 'server\_name', seguido de pelo menos um espaço ou tab."*
+
+  * **Substituir por:** (vazio)
+
+      * O espaço entre os dois últimos delimitadores (`//`) está vazio. Isso significa "substitua o que você encontrou por **nada**".
+
+### Exemplo Prático
+
+Se a linha de entrada for:
+
+```
+[TAB][ESPAÇO]server_name[ESPAÇO][ESPAÇO]api.meudominio.com;
+```
+
+O padrão vai corresponder a (e selecionar) exatamente isto:
+
+```
+[TAB][ESPAÇO]server_name[ESPAÇO][ESPAÇO]
+```
+
+O `sed` então **apaga** essa seleção, deixando para trás apenas:
+
+```
+api.meudominio.com;
+```
+
+Assumo que você quis dizer **`sed -e 's/;//'`**, com `sed` em vez de `p`.
+
+Esse comando é a segunda parte da "limpeza" feita pelo `sed`.
+
+Sua função é: **"Encontrar o primeiro ponto-e-vírgula (`;`) na linha e apagá-lo."**
+
+###  breakdown Detalhado
+
+* **`sed`**: O comando (Stream Editor).
+* **`-e`**: O argumento que diz ao `sed`: "Aqui vem uma expressão/comando para você executar".
+* **`'s/;//'`**: A expressão de substituição.
+    * **`s`**: O comando de **s**ubstituição.
+    * **`/`**: O primeiro delimitador.
+    * **`;`**: O padrão a ser procurado. Neste caso, o caractere literal "ponto-e-vírgula".
+    * **`/`**: O segundo delimitador.
+    * **(nada)**: O texto de substituição. Como não há nada entre o segundo e o terceiro `/`, o `sed` substitui o que encontrou por "nada", ou seja, ele **apaga**.
+    * **`/`**: O terceiro delimitador, fechando o comando.
+
+### No Contexto do Comando Nginx
+
+1.  **Entrada (vinda do `sed` anterior):**
+    `api-local-portal-acessos-villela-ip.meudominio.com;`
+    `meudominio.com www.meudominio.com;`
+
+2.  **Ação do `sed -e 's/;//'`:**
+    * Na primeira linha, ele encontra o `;` no final e o remove.
+    * Na segunda linha, ele encontra o `;` no final e o remove.
+
+3.  **Saída (o que vai para o `sort -u`):**
+    `api-local-portal-acessos-villela-ip.meudominio.com`
+    `meudominio.com www.meudominio.com`
+
+----
+
+O comando `sort -u` é uma forma muito comum e eficiente de fazer duas coisas ao mesmo tempo: **ordenar uma lista** e **remover todas as duplicatas**.
+
+Vamos quebrar os dois componentes:
+
+### 1\. `sort` (O Comando Principal)
+
+  * É o comando padrão do Linux para **ordenar**.
+  * Quando você "envia" (via *pipe* `|`) um texto para o `sort`, ele lê todas as linhas, as reordena em ordem alfabética (ou numérica, se você especificar) e as imprime na nova ordem.
+
+**Exemplo simples do `sort`:**
+
+Se a entrada for:
+
+```
+banana
+maca
+abacate
+banana
+```
+
+A saída do `sort` será:
+
+```
+abacate
+banana
+banana
+maca
+```
+
+### 2\. `-u` (A Opção "Unique")
+
+  * O `-u` é uma opção (um "argumento" ou "flag") que você passa para o `sort`.
+  * Ele vem da palavra "**u**nique" (único).
+  * Essa opção diz ao `sort`: "Depois que você terminar de ordenar, se você encontrar linhas idênticas que estão uma após a outra, imprima apenas a primeira e descarte o resto."
+
+### Como `sort -u` Funciona (O Processo)
+
+Juntar os dois é o que faz a mágica. O processo é:
+
+1.  **Entrada:** O comando recebe sua lista de URLs, que está "limpa" (graças ao `sed`), mas cheia de duplicatas.
+
+    ```
+    api.meudominio.com
+    admin.meudominio.com
+    api.meudominio.com
+    compliance.meudominio.com
+    admin.meudominio.com
+    ```
+
+2.  **Ação do `sort` (A Ordenação):** O comando primeiro ordena tudo alfabeticamente. Isso é **crucial**, pois agrupa todas as duplicatas.
+
+    ```
+    admin.meudominio.com
+    admin.meudominio.com
+    api.meudominio.com
+    api.meudominio.com
+    compliance.meudominio.com
+    ```
+
+3.  **Ação do `-u` (A Deduplicação):** Agora, o `sort` percorre essa lista ordenada e aplica a regra "único":
+
+      * "Imprima `admin.meudominio.com`."
+      * "Opa, a próxima linha também é `admin.meudominio.com`. Ignore-a."
+      * "Imprima `api.meudominio.com`."
+      * "Opa, a próxima linha também é `api.meudominio.com`. Ignore-a."
+      * "Imprima `compliance.meudominio.com`."
+
+4.  **Saída Final:** O resultado é a sua lista perfeitamente ordenada e única.
+
+    ```
+    admin.meudominio.com
+    api.meudominio.com
+    compliance.meudominio.com
+    ```
+
+Em resumo: `sort -u` é o "pacote completo" para pegar uma lista bagunçada e devolvê-la ordenada e sem repetições.
+
+===============================================================================
+=====
+===============================================================================
