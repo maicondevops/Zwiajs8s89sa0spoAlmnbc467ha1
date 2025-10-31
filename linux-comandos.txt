@@ -98,7 +98,7 @@ Sua função é: **"Encontrar o primeiro ponto-e-vírgula (`;`) na linha e apag�
 ### No Contexto do Comando Nginx
 
 1.  **Entrada (vinda do `sed` anterior):**
-    `api-local-portal-acessos-villela-ip.meudominio.com;`
+    `api-local-portal-acessos-empresa-ip.meudominio.com;`
     `meudominio.com www.meudominio.com;`
 
 2.  **Ação do `sed -e 's/;//'`:**
@@ -106,7 +106,7 @@ Sua função é: **"Encontrar o primeiro ponto-e-vírgula (`;`) na linha e apag�
     * Na segunda linha, ele encontra o `;` no final e o remove.
 
 3.  **Saída (o que vai para o `sort -u`):**
-    `api-local-portal-acessos-villela-ip.meudominio.com`
+    `api-local-portal-acessos-empresa-ip.meudominio.com`
     `meudominio.com www.meudominio.com`
 
 ----
